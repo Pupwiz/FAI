@@ -7,7 +7,7 @@ cd /opt/cockpit-files
 make
 sudo make install 
 # live enable tailscale to my account
-# tailscale up -authkey tskey-auth-k7BaJibC5j11CNTRL-hNR1AHPANR5PeqMDn2ybN5Gu4nK9xxAqh -ssh
+# tailscale up -authkey #### -ssh
 (crontab -u root -l ; echo "@reboot /home/media/surfsafe/checkstatus.sh") | crontab -u root -
 (crontab -u root -l ; echo "0 */4 * * * /home/media/surfsafe/checkstatus.sh") | crontab -u root -
 cd /home/media 
