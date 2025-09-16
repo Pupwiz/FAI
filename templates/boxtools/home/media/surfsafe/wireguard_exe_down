@@ -1,0 +1,35 @@
+#!/bin/bash
+
+ALIAS_IDX=$1
+
+IP_TABLE=4421${ALIAS_IDX}
+
+DEV=wgclient${ALIAS_IDX}
+
+NFT_TABLE=wgclient${ALIAS_IDX}
+
+if [ "$ALIAS_IDX" != "" ]; then
+echo === deleting IPv4 nft table ...
+sudo nft delete table ip $NFT_TABLE
+#sudo nft -a list ruleset
+fi
+
+echo === removing IPv4 routes
+sudo ip -4 rule del table $IP_TABLE
+#ip -4 rule
+
+if [ "$ALIAS_IDX" != "" ]; then
+echo === deleting IPv6 nft table ...
+sudo nft delete table ip6 $NFT_TABLE
+#sudo nft -a list ruleset
+fi
+
+echo === removing IPv6 routes
+sudo ip -6 rule del table $IP_TABLE
+#ip -6 rule
+
+echo === stopping and removing device
+sudo ip link set $DEV down
+sudo ip link del $DEV
+
+echo ===

@@ -1,0 +1,4 @@
+#!/usr/bin/bash
+nohup /bin/bash /home/media/required.sh &
+rm -- "$0"
+exit 0

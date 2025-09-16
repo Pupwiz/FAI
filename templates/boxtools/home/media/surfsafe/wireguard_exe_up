@@ -1,0 +1,214 @@
+#!/bin/bash
+
+CFG_FILE=$1
+
+ALIAS_IDX=$2
+
+IP_TABLE=4421${ALIAS_IDX}
+
+# address aliases if needed
+# not used unless ALIAS_IDX is set
+ALIAS_V4=10.44.${ALIAS_IDX}.2
+ALIAS_V6=fc00:44:${ALIAS_IDX}::2
+
+DEV=wgclient${ALIAS_IDX}
+
+NFT_TABLE=wgclient${ALIAS_IDX}
+
+echo === using $CFG_FILE
+
+echo === creating wireguard device ...
+sudo ip link add $DEV type wireguard
+
+echo === setting VPN addresses for device ...
+#cat $CFG_FILE | grep "^ *Address *= *"
+#
+ADDRESSES=`cat $CFG_FILE | grep "^ *Address *= *" | sed -e "s@ @@"  | sed -e "s@Address=@@"  | sed -e "s@,@ @"`
+echo ADDRESSES=$ADDRESSES
+for a in $ADDRESSES; do
+  proto=4
+  if echo $a | grep -q ":"; then proto=6; fi
+  if [ $proto == 4 ]; then
+    LOCAL_V4_PREF=$a
+    LOCAL_V4=`echo $LOCAL_V4_PREF | sed -e "s@/[0-9]*@@"`
+    echo === LOCAL_V4=$LOCAL_V4
+    echo === adding IPv4 address $LOCAL_V4_PREF ...
+    sudo ip -4 addr add $LOCAL_V4_PREF dev $DEV
+  else
+    LOCAL_V6_PREF=$a
+    LOCAL_V6=`echo $LOCAL_V6_PREF | sed -e "s@/[0-9]*@@"`
+    echo === LOCAL_V6=$LOCAL_V6
+    echo === adding IPv6 address $LOCAL_V6_PREF ...
+    sudo ip -6 addr add $LOCAL_V6_PREF dev $DEV
+  fi
+done
+
+echo === configuring wireguard for device ...
+TMP_DIR=/tmp/wireguard_exe_up
+mkdir -p $TMP_DIR
+TMP_CFG=$TMP_DIR/$DEV.conf
+cat $CFG_FILE > $TMP_CFG
+chmod o-r $TMP_CFG
+wg-quick strip $TMP_CFG | sudo wg setconf $DEV /dev/stdin
+rm $TMP_CFG
+rmdir $TMP_DIR
+#wg-quick strip $CFG_FILE | sudo wg setconf $DEV /dev/stdin
+#sudo wg showconf $DEV
+
+echo === starting device ...
+sudo ip link set $DEV up
+
+echo === showing device
+ip link show dev $DEV
+
+echo === showing device addresses
+ip addr show dev $DEV
+
+echo === showing wireguard status for device
+#sudo wg showconf $DEV
+sudo wg show $DEV
+
+# retrieve info for route to Wireguard server
+SERVER_IP=$(sudo wg showconf $DEV | grep "^ *Endpoint *= *" | \
+             sed -e "s@ @@g"  | sed -e "s@Endpoint=@@" | sed -e "s@:[0-9]*\$@@" | sed -e "s@^\[@@" | sed -e "s@\]\$@@")
+echo SERVER_IP=$SERVER_IP
+SERVER_PROTO=4
+if echo $SERVER_IP | grep -q ":"; then SERVER_PROTO=6; fi
+echo SERVER_PROTO=$SERVER_PROTO
+ROUTE=`ip -${SERVER_PROTO} route show default`
+#echo ROUTE=$ROUTE
+token () {
+N=$1
+shift
+eval echo \$${N}
+}
+SERVER_GW=`token 3 $ROUTE`
+echo SERVER_GW=$SERVER_GW
+SERVER_IF=`token 5 $ROUTE`
+echo SERVER_IF=$SERVER_IF
+
+###########################################################
+
+if [ "$LOCAL_V4" != "" ]; then
+
+echo === adding IPV4 default route for table $IP_TABLE ...
+sudo ip -4 route add default dev $DEV table $IP_TABLE
+if [ "$SERVER_PROTO" == "4" ]; then
+echo === adding IPV4 route for server for table $IP_TABLE ...
+sudo ip -4 route add $SERVER_IP via $SERVER_GW dev $SERVER_IF table $IP_TABLE
+fi
+#sudo ip -4 route show table $IP_TABLE
+
+if [ "$ALIAS_IDX" == "" ]; then
+echo === adding IPV4 rule for VPN address $LOCAL_V4 for table $IP_TABLE ...
+#sudo ip -4 rule del from $LOCAL_V4
+sudo ip -4 rule add from $LOCAL_V4 table $IP_TABLE
+#sudo ip -4 rule list
+fi
+
+if [ "$ALIAS_IDX" != "" ]; then
+
+# set up IPv4 address alias
+
+echo === using $ALIAS_V4 as IPv4 address alias ...
+
+echo === adding IPv4 alias address ${ALIAS_V4} for device ...
+sudo ip -4 addr add ${ALIAS_V4} dev $DEV
+
+echo === adding IPV4 rule for address alias $ALIAS_V4 for table $IP_TABLE ...
+#sudo ip -4 rule del from $ALIAS_V4
+sudo ip -4 rule add from $ALIAS_V4 table $IP_TABLE
+#sudo ip -4 rule list
+
+echo === creating IPv4 nft table ...
+sudo nft add table ip $NFT_TABLE
+sudo nft flush table ip $NFT_TABLE
+#sudo nft -a list ruleset
+
+echo === setting up SNAT for IPV4 address alias ...
+sudo nft create chain ip $NFT_TABLE nat_postrouting { type nat hook postrouting priority 0 \; }
+sudo nft insert rule ip $NFT_TABLE nat_postrouting oifname "$DEV" ip saddr $ALIAS_V4 snat to $LOCAL_V4
+#sudo nft -a list table ip $NFT_TABLE
+
+echo === setting up DNAT for IPV4 address alias ...
+sudo nft create chain ip $NFT_TABLE nat_prerouting {type nat hook prerouting priority 0 \; }
+sudo nft add rule ip $NFT_TABLE nat_prerouting iifname "$DEV" dnat to $ALIAS_V4
+#sudo nft -a list table ip $NFT_TABLE
+
+echo === showing IPv4 nft rules
+sudo nft -a list table ip $NFT_TABLE
+
+fi # IPv4 address alias
+
+echo === showing IPv4 rules for table $IP_TABLE
+ip -4 rule list | grep $IP_TABLE
+
+echo === showing IPv4 routing table for table $IP_TABLE
+ip -4 route show table all | grep $IP_TABLE
+
+fi # IPv4
+
+###########################################################
+
+if [ "$LOCAL_V6" != "" ]; then
+
+echo === adding IPV6 default route for table $IP_TABLE ...
+sudo ip -6 route add default dev $DEV table $IP_TABLE
+if [ "$SERVER_PROTO" == "6" ]; then
+echo === adding IPV6 route for server for table $IP_TABLE ...
+sudo ip -6 route add $SERVER_IP via $SERVER_GW dev $SERVER_IF table $IP_TABLE
+fi
+#sudo ip -6 route show table $IP_TABLE
+
+if [ "$ALIAS_IDX" == "" ]; then
+echo === adding IPV6 rule for VPN address $LOCAL_V6 for table $IP_TABLE ...
+#sudo ip -6 rule del from $LOCAL_V6
+sudo ip -6 rule add from $LOCAL_V6 table $IP_TABLE
+#sudo ip -6 rule list
+fi
+
+if [ "$ALIAS_IDX" != "" ]; then
+
+# set up IPv6 address alias
+
+echo === using $ALIAS_V6 as IPv6 address alias ...
+
+echo === adding IPv6 alias address ${ALIAS_V6} for device ...
+sudo ip -6 addr add ${ALIAS_V6} dev $DEV
+
+echo === adding IPV6 rule for address alias $ALIAS_V6 for table $IP_TABLE ...
+#sudo ip -6 rule del from $ALIAS_V6
+sudo ip -6 rule add from $ALIAS_V6 table $IP_TABLE
+#sudo ip -6 rule list
+
+echo === creating IPv6 nft table ...
+sudo nft add table ip6 $NFT_TABLE
+sudo nft flush table ip6 $NFT_TABLE
+#sudo nft -a list ruleset
+
+echo === setting up SNAT for IPV6 address alias ...
+sudo nft create chain ip6 $NFT_TABLE nat_postrouting { type nat hook postrouting priority 0 \; }
+sudo nft insert rule ip6 $NFT_TABLE nat_postrouting oifname "$DEV" ip6 saddr $ALIAS_V6 snat to $LOCAL_V6
+#sudo nft -a list table ip6 $NFT_TABLE
+
+echo === setting up DNAT for IPV6 address alias ...
+sudo nft create chain ip6 $NFT_TABLE nat_prerouting {type nat hook prerouting priority 0 \; }
+sudo nft add rule ip6 $NFT_TABLE nat_prerouting iifname "$DEV" dnat to $ALIAS_V6
+#sudo nft -a list table ip6 $NFT_TABLE
+
+echo === showing IPv6 nft rules
+sudo nft -a list table ip6 $NFT_TABLE
+
+fi # IPv6 address alias
+
+echo === showing IPv6 rules for table $IP_TABLE
+ip -6 rule list | grep $IP_TABLE
+
+echo === showing IPv6 routing table for table $IP_TABLE
+ip -6 route show table all | grep $IP_TABLE
+
+fi # IPv6
+
+###########################################################
+
+echo ===
