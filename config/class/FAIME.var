@@ -1,0 +1,12 @@
+KEYMAP=us
+TIMEZONE=UTC
+locales="en_US"
+ROOTPW=''
+username=media
+USERPW='$6$C.9C2PaLRcrosZ55$VV16oB28W4iMPxu5CmRLHLw7H07Hp73B1xGnV6TiJBYjtpms9J.qyBoZTac2HwwcvfyWTJkSyYAJ3ktQbyJHG1'
+HOSTNAME=mediabox
+release=trixie
+secsuite=trixie-security
+bpo=
+postinst=
+rclocal=1

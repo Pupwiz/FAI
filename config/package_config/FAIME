@@ -1,0 +1,13 @@
+PACKAGES install-norec
+python3-venv xrdp xorgxrdp nodejs npm 
+PACKAGES install
+task-english
+PACKAGES install-norec
+xorg xinit xserver-xorg-core xserver-xorg-video-nvidia x11-xserver-utils x11-xkb-utils x11-utils thunar xfce4-panel xfce4-session xfce4-settings xfce4-terminal xfconf xfdesktop4 xfwm4 xserver-xorg-input-kbd xserver-xorg-input-libinput gnome-brave-icon-theme screen gvfs xvfb 
+
+PACKAGES install
+network-manager-openvpn network-manager-gnome network-manager-openvpn-gnome mousepad bleachbit timeshift chromium udisks2-lvm2 udisks2-btrfs dkms linux-headers-generic wireguard screen psutil
+
+PACKAGES install
+cockpit cockpit-storaged cockpit-podman gettext make qbittorrent-nox git sqlite3 nginx-extras python3-tk python3-dev
+

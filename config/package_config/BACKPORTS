@@ -1,0 +1,8 @@
+# this part is currently used because these are not available as bpo for bullseye
+# move from NONFREE into this file
+PACKAGES install BULLSEYE BOOKWORM
+# you may want these non-free kernel drivers
+firmware-bnx2 firmware-bnx2x firmware-realtek
+firmware-linux-nonfree
+linux-image-amd64$bpo # yes bpo kernel is already available
+wireless-regdb # not yet available as bpo

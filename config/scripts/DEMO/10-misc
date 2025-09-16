@@ -1,0 +1,53 @@
+#! /bin/bash
+
+# (c) Thomas Lange, 2001-2017, lange@debian.org
+
+error=0; trap 'error=$(($?>$error?$?:$error))' ERR # save maximum error code
+
+set_default_panel() {
+    userdir=$($ROOTCMD getent passwd "$username" | cut -d: -f6 )
+    # disable xfce question about default or empty panel
+    if [ -f $target/etc/xdg/xfce4/panel/default.xml ]; then
+	xfdir=$userdir/.config/xfce4/xfconf/xfce-perchannel-xml
+	if [ ! -d $target/$xfdir ]; then
+	    $ROOTCMD mkdir -p $xfdir
+	    $ROOTCMD cp /etc/xdg/xfce4/panel/default.xml $xfdir/xfce4-panel.xml
+	    # group name is the same as user name
+	    $ROOTCMD chown -R $username:$username $userdir/.config
+	fi
+    fi
+}
+
+ifclass XORG && {
+    fcopy -M /etc/X11/xorg.conf
+}
+
+if ifclass UBUNTU; then
+     groups="adm cdrom sudo dip plugdev lpadmin sambashare"
+     $ROOTCMD addgroup --system lpadmin || true
+     $ROOTCMD addgroup --system sambashare || true
+fi
+
+# add additional user account
+if [ -n "$username" ]; then
+    if ! $ROOTCMD getent passwd $username ; then
+	$ROOTCMD adduser --disabled-password --gecos "$username" $username
+	$ROOTCMD usermod -p "$USERPW" $username
+	if [ -z "$ROOTPW" ]; then
+	    # enable sudo for user, if no root PW was set
+	    $ROOTCMD usermod -aG sudo $username
+	    if [ ! -f $target/usr/bin/sudo ]; then
+		echo "WARNING. Package sudo is not installed"
+	    fi
+	fi
+
+	for g in $groups; do
+	    $ROOTCMD adduser $username $g
+	done
+
+        # do not copy for linuxmint
+        if ifclass '! MINT'; then
+            set_default_panel
+        fi
+    fi
+fi

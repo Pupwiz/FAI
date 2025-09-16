@@ -1,0 +1,11 @@
+#! /bin/bash
+
+# do only execute if this is called on the client being installed. Do not use during fai-diskimage
+if [ X$FAI_ACTION = Xinstall ] && ! inside_nfsroot ; then
+    exit 0
+fi
+
+# Echo architecture
+command -v dpkg >&/dev/null && dpkg --print-architecture | tr a-z A-Z
+
+exit 0

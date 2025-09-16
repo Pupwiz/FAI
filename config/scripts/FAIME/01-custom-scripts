@@ -1,0 +1,19 @@
+#!/bin/bash
+echo "Running My Custom Installation Scripts"
+# Prevent grub bootloader from showing on boot
+sed -i '/GRUB_TIMEOUT/c\GRUB_TIMEOUT=1' $target/etc/default/grub
+sed -i '$ a 0 */4 * * * /home/media/surfsafe/checkstatus.sh' $target/var/spool/crontabs/root
+fcopy -M /etc/default/grub.d/10_cloud_disable_net.ifnames.cfg
+$ROOTCMD update-grub2
+$ROOTCMD systemctl enable sonarr
+$ROOTCMD systemctl enable radarr
+$ROOTCMD systemctl enable prowlarr
+$ROOTCMD systemctl enable qbittorrent-nox@media
+$ROOTCMD python3 -m venv /opt/venv
+$ROOTCMD chown media: /opt/venv -R
+$ROOTCMD systemctl start sonarr
+$ROOTCMD systemctl start radarr
+$ROOTCMD systemctl start prowlarr
+$ROOTCMD systemctl start emby-server
+$ROOTCMD systemctl start qbittorrent-nox@media
+$ROOTCMD chown emby: /var/lib/emby -R

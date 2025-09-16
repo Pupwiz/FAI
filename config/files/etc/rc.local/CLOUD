@@ -1,0 +1,19 @@
+#! /bin/bash
+
+# regenerate ssh_host keys
+ls /etc/ssh/ssh_host_* >/dev/null 2>&1
+if [ $? -ne 0 ]; then
+    dpkg-reconfigure -fnoninteractive openssh-server
+    systemctl reset-failed ssh
+    systemctl restart ssh
+fi
+
+# A users rc.local was renamed to rc.local.pre_fcopy
+# now call is after rc.local of FAI
+if [ -f /etc/rc.local.pre_fcopy ]; then
+    mv /etc/rc.local /etc/rc.local.FAI
+    mv /etc/rc.local.pre_fcopy /etc/rc.local
+    exec /etc/rc.local
+else
+    rm $0
+fi
